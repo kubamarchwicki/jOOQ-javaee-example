@@ -13,11 +13,8 @@ import javax.json.JsonArray;
 import javax.json.JsonBuilderFactory;
 import javax.json.JsonObject;
 import javax.json.JsonReader;
-import javax.transaction.HeuristicMixedException;
-import javax.transaction.HeuristicRollbackException;
-import javax.transaction.NotSupportedException;
-import javax.transaction.RollbackException;
 import javax.transaction.SystemException;
+import javax.transaction.Transactional;
 import javax.transaction.UserTransaction;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -34,17 +31,15 @@ import static org.jooq.example.db.mysql.Tables.*;
 public class BooksRepository {
 
     final static Logger log = Logger.getLogger(BooksRepository.class.getName());
-
-    @Inject
-    private DSLContext ctx;
-
     @Resource
     UserTransaction tx;
+    @Inject
+    private DSLContext ctx;
 
     @GET
     @Path("/")
     public JsonArray getAllBooks() {
-        Result<Record4<String,String,String,Integer>> books = ctx.select(AUTHOR.FIRST_NAME, AUTHOR.LAST_NAME, BOOK.TITLE, BOOK.PUBLISHED_IN)
+        Result<Record4<String, String, String, Integer>> books = ctx.select(AUTHOR.FIRST_NAME, AUTHOR.LAST_NAME, BOOK.TITLE, BOOK.PUBLISHED_IN)
                 .from(BOOK)
                 .join(AUTHOR).on(BOOK.AUTHOR_ID.equal(AUTHOR.ID))
                 .fetch();
@@ -62,6 +57,7 @@ public class BooksRepository {
 
     @POST
     @Path("/")
+    @Transactional
     public JsonObject saveBook(String messageBody) throws SystemException {
 //        {
 //            "author_firstname": "",
@@ -74,33 +70,23 @@ public class BooksRepository {
         JsonObject object = reader.readObject();
         reader.close();
 
-        try {
-            tx.begin();
+        AuthorRecord authorRecord = ctx.insertInto(AUTHOR, AUTHOR.FIRST_NAME, AUTHOR.LAST_NAME)
+                .values(object.getString("author_firstname"), object.getString("author_lastname"))
+                .returning()
+                .fetchOne();
 
-            AuthorRecord authorRecord = ctx.insertInto(AUTHOR, AUTHOR.FIRST_NAME, AUTHOR.LAST_NAME)
-                    .values(object.getString("author_firstname"), object.getString("author_lastname"))
-                    .returning()
-                    .fetchOne();
+        BookRecord bookRecord = ctx.insertInto(BOOK, BOOK.AUTHOR_ID, BOOK.TITLE, BOOK.PUBLISHED_IN)
+                .values(authorRecord.getId(), object.getString("title"), object.getInt("published_in"))
+                .returning().fetchOne();
 
-            BookRecord bookRecord = ctx.insertInto(BOOK, BOOK.AUTHOR_ID, BOOK.TITLE, BOOK.PUBLISHED_IN)
-                    .values(authorRecord.getId(), object.getString("title"), object.getInt("published_in"))
-                    .returning().fetchOne();
+        return Json.createObjectBuilder()
+                .add("author_id", authorRecord.getId())
+                .add("author_firstname", authorRecord.getFirstName())
+                .add("author_lastname", authorRecord.getFirstName())
+                .add("book_id", bookRecord.getId())
+                .add("book_title", bookRecord.getTitle())
+                .add("book_published_in", bookRecord.getPublishedIn()).build();
 
-            tx.commit();
-
-            return Json.createObjectBuilder()
-                    .add("author_id", authorRecord.getId())
-                    .add("author_firstname", authorRecord.getFirstName())
-                    .add("author_lastname", authorRecord.getFirstName())
-                    .add("book_id", bookRecord.getId())
-                    .add("book_title", bookRecord.getTitle())
-                    .add("book_published_in", bookRecord.getPublishedIn()).build();
-
-        } catch (HeuristicRollbackException | RollbackException | NotSupportedException | HeuristicMixedException e) {
-           log.info("Transaction rollback " + e.getMessage());
-           tx.rollback();
-           throw new RuntimeException(e);
-        }
     }
 
 }
