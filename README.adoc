@@ -1,0 +1,90 @@
+= jOOQ JavaEE example
+
+This example shows basic configuration for jOOQ on a JavaEE 7 compliant application server (was tested with Wildfly 8.x).
+The example focuses on few elements, handy when implementing a non JPA based "database handling" libraries
+
+== Resource producers
+
+An annotation `@javax.enterprise.inject.Produces` is used to prepare the `DSLContext` object (with a desired datasource
+and database dialect). The produced beans becomes injectable within an application as any other CDI bean (since CDI 1.0)
+
+[source, java]
+----
+include::src/main/java/org/jooq/example/db/mysql/BooksRepository.java[lines=30..31]
+----
+
+
+== Transaction handling
+
+While jOOQ does not provide an API for transaction handling, it takes any DataSource (no matter how produced). Hence, if transaction can be provided externally (outside of jOOQ) a certain level of coupling between SQL statements can be provided.
+In this example we are using `@Transactional` annotation (since JTA 1.2).
+
+[quote]
+____
+The `javax.transaction.Transactional` annotation provides the application the ability to declaratively control transaction boundaries on CDI managed beans, as well as classes defined as managed beans by the Java EE specification, at both the class and method level where method level annotations override those at the class level.
+
+This support is provided via an implementation of CDI interceptors that conduct the necessary suspending, resuming, etc.
+____
+
+In case of older Application Servers (JavaEE 6), a more verbose approach is required, using a lower level `UserTransaction` API
+
+[source, java]
+----
+@Resource
+UserTransaction tx
+
+public void transactionalOperation() {}
+  try {
+   tx.begin();
+
+   //some operations on DSLContext
+
+   tx.commit();
+  } catch (HeuristicRollbackException |
+           RollbackException |
+           NotSupportedException |
+           HeuristicMixedException e) {
+   tx.rollback();
+   throw new RuntimeException(e);
+  }
+}
+
+----
+
+== Application server datasource configuration
+
+MySQL was used as a database for this example. Wildfly datasource configuration may look as follows:
+
+[source, xml]
+----
+<datasources>
+  <datasource
+    jndi-name="java:jboss/datasources/JooqExampleDS"
+    pool-name="JooqExampleDS"
+    enabled="true"
+    use-java-context="true">
+    <connection-url>
+      jdbc:mysql://localhost/jooq
+    </connection-url>
+    <driver>mysql</driver>
+    <security>
+      <user-name>username</user-name>
+      <password>password</password>
+    </security>
+  </datasource>
+  <drivers>
+    <driver name="mysql" module="com.mysql"> // <1>
+      <driver-class>com.mysql.jdbc.Driver</driver-class>
+    </driver>
+  </drivers>
+</datasources>
+----
+<1> The module needs to be defined externally - see http://wildfly.org/news/2014/02/06/GlassFish-to-WildFly-migration/[Wildfly blog for reference - Creating a Module section]
+
+
+== TODO
+
+Some additional 'feature' will be added to make the example more complete:
+
+- [ ]  PUT REST method to show resource update with jOOQ
+- [ ]  example test, that verifies the transactin handling (and rollback)
