@@ -8,9 +8,10 @@ The example focuses on few elements, handy when implementing a non JPA based "da
 An annotation `@javax.enterprise.inject.Produces` is used to prepare the `DSLContext` object (with a desired datasource
 and database dialect). The produced beans becomes injectable within an application as any other CDI bean (since CDI 1.0)
 
-[source, java]
+[source, java, indent=2]
 ----
-include::src/main/java/org/jooq/example/db/mysql/BooksRepository.java[lines=30..31]
+@Inject
+private DSLContext ctx;
 ----
 
 
