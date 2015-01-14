@@ -6,7 +6,6 @@ import org.jooq.Result;
 import org.jooq.example.db.mysql.tables.records.AuthorRecord;
 import org.jooq.example.db.mysql.tables.records.BookRecord;
 
-import javax.annotation.Resource;
 import javax.inject.Inject;
 import javax.json.Json;
 import javax.json.JsonArray;
@@ -15,14 +14,12 @@ import javax.json.JsonObject;
 import javax.json.JsonReader;
 import javax.transaction.SystemException;
 import javax.transaction.Transactional;
-import javax.transaction.UserTransaction;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import java.io.StringReader;
 import java.util.Collections;
-import java.util.logging.Logger;
 
 import static org.jooq.example.db.mysql.Tables.*;
 
@@ -30,9 +27,6 @@ import static org.jooq.example.db.mysql.Tables.*;
 @Produces("application/json")
 public class BooksRepository {
 
-    final static Logger log = Logger.getLogger(BooksRepository.class.getName());
-    @Resource
-    UserTransaction tx;
     @Inject
     private DSLContext ctx;
 
